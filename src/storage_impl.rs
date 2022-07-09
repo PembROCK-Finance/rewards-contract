@@ -1,7 +1,7 @@
 use near_contract_standards::storage_management::{
     StorageBalance, StorageBalanceBounds, StorageManagement,
 };
-use near_sdk::{env, json_types::U128, near_bindgen, AccountId, Balance};
+use near_sdk::{env, json_types::U128, log, near_bindgen, AccountId, Balance};
 
 use crate::*;
 
@@ -14,7 +14,28 @@ impl StorageManagement for Contract {
         account_id: Option<AccountId>,
         registration_only: Option<bool>,
     ) -> StorageBalance {
-        unimplemented!()
+        let amount: Balance = env::attached_deposit();
+        let min_balance = self.storage_balance_bounds().min.0;
+        let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
+        if self.is_account_registered(&account_id) {
+            log!("The account is already registered, refunding the deposit");
+            if amount > 0 {
+                Promise::new(env::predecessor_account_id()).transfer(amount);
+            }
+        } else {
+            if amount < min_balance {
+                env::panic_str("The attached deposit is less than the minimum storage balance");
+            }
+            self.claimed_rewards.insert(&account_id, &0);
+            let refund = amount - min_balance;
+            if refund > 0 {
+                Promise::new(env::predecessor_account_id()).transfer(refund);
+            }
+        }
+        StorageBalance {
+            total: min_balance.into(),
+            available: 0.into(),
+        }
     }
 
     #[payable]
