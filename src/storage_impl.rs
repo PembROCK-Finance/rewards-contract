@@ -26,7 +26,7 @@ impl StorageManagement for Contract {
             if amount < min_balance {
                 env::panic_str("The attached deposit is less than the minimum storage balance");
             }
-            self.claimed_rewards.insert(&account_id, &0);
+            self.register_account(&account_id);
             let refund = amount - min_balance;
             if refund > 0 {
                 Promise::new(env::predecessor_account_id()).transfer(refund);

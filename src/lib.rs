@@ -69,6 +69,10 @@ impl Contract {
         self.claimed_rewards.keys().any(|aid| aid == *account_id)
     }
 
+    fn register_account(&mut self, account_id: &AccountId) {
+        self.claimed_rewards.insert(account_id, &0);
+    }
+
     ///
     pub fn owner_withdraw(&mut self, amount: U128) -> Promise {
         assert_one_yocto();
