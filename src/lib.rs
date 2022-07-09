@@ -10,10 +10,13 @@ use pembrock_integration::{ext_pembrock, AccountInfo};
 mod pembrock_integration;
 mod storage_impl;
 
-const GAS_FOR_FT_TRANSFER_CALLBACK: Gas = Gas(5_000_000_000_000);
-const GAS_FOR_FT_TRANSFER: Gas = Gas(25_000_000_000_000 + GAS_FOR_FT_TRANSFER_CALLBACK.0);
-const GAS_FOR_GET_ACCOUNT_CALLBACK: Gas = Gas(5_000_000_000_000 + GAS_FOR_FT_TRANSFER.0);
-const GAS_FOR_GET_ACCOUNT: Gas = Gas(25_000_000_000_000 + GAS_FOR_GET_ACCOUNT_CALLBACK.0);
+const GAS_FOR_FT_TRANSFER_CALLBACK: Gas = Gas(10_000_000_000_000);
+const GAS_FOR_FT_TRANSFER: Gas = Gas(10_000_000_000_000);
+const GAS_FOR_GET_ACCOUNT_CALLBACK: Gas =
+    Gas(5_000_000_000_000 + GAS_FOR_FT_TRANSFER.0 + GAS_FOR_FT_TRANSFER_CALLBACK.0);
+const GAS_FOR_GET_ACCOUNT: Gas = Gas(25_000_000_000_000);
+const GAS_FOR_CLAIM: Gas =
+    Gas(25_000_000_000_000 + GAS_FOR_GET_ACCOUNT.0 + GAS_FOR_GET_ACCOUNT_CALLBACK.0);
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -67,8 +70,18 @@ impl Contract {
     }
 
     ///
-    pub fn owner_withdraw(&mut self) {
-        todo!()
+    pub fn owner_withdraw(&mut self, amount: U128) -> Promise {
+        assert_one_yocto();
+
+        require!(
+            env::predecessor_account_id() == self.owner_id,
+            "Not an owner"
+        );
+
+        ext_ft_core::ext(self.pem_token_id.clone())
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .with_attached_deposit(1)
+            .ft_transfer(self.owner_id.clone(), amount, None)
     }
 
     ///
@@ -80,13 +93,11 @@ impl Contract {
     }
 
     ///
+    /// Returns claimed amount
     pub fn claim(&self) -> Promise {
         assert_one_yocto();
 
-        require!(
-            env::prepaid_gas() > GAS_FOR_GET_ACCOUNT,
-            "More gas is required"
-        );
+        require!(env::prepaid_gas() >= GAS_FOR_CLAIM, "More gas is required");
 
         let account_id = env::predecessor_account_id();
         require!(
@@ -95,7 +106,7 @@ impl Contract {
         );
 
         ext_pembrock::ext(self.pembrock_id.clone())
-            .with_static_gas(env::prepaid_gas() - GAS_FOR_GET_ACCOUNT)
+            .with_static_gas(GAS_FOR_GET_ACCOUNT)
             .get_account(&account_id)
             .then(
                 Self::ext(env::current_account_id())
@@ -125,7 +136,8 @@ impl Contract {
         self.claimed_rewards.insert(&account_id, &total_rewards);
 
         ext_ft_core::ext(self.pem_token_id.clone())
-            .with_static_gas(env::prepaid_gas() - GAS_FOR_FT_TRANSFER)
+            .with_static_gas(GAS_FOR_FT_TRANSFER)
+            .with_attached_deposit(1)
             .ft_transfer(account_id.clone(), unclaimed_rewards.into(), None)
             .then(
                 Self::ext(env::current_account_id())
