@@ -17,20 +17,19 @@ impl StorageManagement for Contract {
         let amount: Balance = env::attached_deposit();
         let min_balance = self.storage_balance_bounds().min.0;
         let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
-        if self.is_account_registered(&account_id) {
+        let refund = if self.is_account_registered(&account_id) {
             log!("The account is already registered, refunding the deposit");
-            if amount > 0 {
-                Promise::new(env::predecessor_account_id()).transfer(amount);
-            }
+            amount
         } else {
-            if amount < min_balance {
-                env::panic_str("The attached deposit is less than the minimum storage balance");
-            }
+            require!(
+                amount >= min_balance,
+                "The attached deposit is less than the minimum storage balance"
+            );
             self.register_account(&account_id);
-            let refund = amount - min_balance;
-            if refund > 0 {
-                Promise::new(env::predecessor_account_id()).transfer(refund);
-            }
+            amount - min_balance
+        };
+        if refund > 0 {
+            Promise::new(env::predecessor_account_id()).transfer(refund);
         }
         StorageBalance {
             total: min_balance.into(),
