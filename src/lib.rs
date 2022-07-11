@@ -91,7 +91,7 @@ impl Contract {
     ///
     pub fn get_claimed_rewards(&self, account_id: &AccountId) -> U128 {
         self.claimed_rewards
-            .get(&account_id)
+            .get(account_id)
             .unwrap_or_default()
             .into()
     }
@@ -117,7 +117,6 @@ impl Contract {
                     .with_static_gas(GAS_FOR_GET_ACCOUNT_CALLBACK)
                     .get_account_callback(account_id),
             )
-            .into()
     }
 
     #[private]
