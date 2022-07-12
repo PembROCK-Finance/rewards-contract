@@ -66,7 +66,7 @@ impl Contract {
     }
 
     fn is_account_registered(&self, account_id: &AccountId) -> bool {
-        self.claimed_rewards.get(account_id).is_some()
+        self.claimed_rewards.keys().any(|aid| aid == *account_id)
     }
 
     fn register_account(&mut self, account_id: &AccountId) {
