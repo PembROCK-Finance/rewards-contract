@@ -66,11 +66,13 @@ impl Contract {
     }
 
     fn is_account_registered(&self, account_id: &AccountId) -> bool {
-        self.claimed_rewards.keys().any(|aid| aid == *account_id)
+        self.claimed_rewards.get(account_id).is_some()
     }
 
     fn register_account(&mut self, account_id: &AccountId) {
-        self.claimed_rewards.insert(account_id, &0);
+        if self.claimed_rewards.insert(account_id, &0).is_some() {
+            env::panic_str("The account is already registered");
+        }
     }
 
     ///
