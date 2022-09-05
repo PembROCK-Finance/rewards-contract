@@ -13,8 +13,8 @@ mod storage_impl;
 const GAS_FOR_FT_TRANSFER_CALLBACK: Gas = Gas(10_000_000_000_000);
 const GAS_FOR_FT_TRANSFER: Gas = Gas(10_000_000_000_000);
 const GAS_FOR_GET_ACCOUNT_CALLBACK: Gas =
-    Gas(5_000_000_000_000 + GAS_FOR_FT_TRANSFER.0 + GAS_FOR_FT_TRANSFER_CALLBACK.0);
-const GAS_FOR_CLAIM: Gas = Gas(10_000_000_000_000);
+    Gas(10_000_000_000_000 + GAS_FOR_FT_TRANSFER.0 + GAS_FOR_FT_TRANSFER_CALLBACK.0);
+const GAS_FOR_CLAIM: Gas = Gas(15_000_000_000_000);
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
