@@ -65,7 +65,7 @@ impl Contract {
     }
 
     fn is_account_registered(&self, account_id: &AccountId) -> bool {
-        self.claimed_rewards.keys().any(|aid| aid == *account_id)
+        self.claimed_rewards.get(&account_id).is_some()
     }
 
     fn register_account(&mut self, account_id: &AccountId) {
@@ -104,26 +104,24 @@ impl Contract {
 
         require!(env::prepaid_gas() >= GAS_FOR_CLAIM + GAS_FOR_GET_ACCOUNT_CALLBACK, "More gas is required");
 
+        log!("Prepaid gas {}, used gas before {}", env::prepaid_gas().0, env::used_gas().0);
+
         let account_id = env::predecessor_account_id();
         require!(
             self.is_account_registered(&account_id),
             "Account is not registered"
         );
 
-        log!("claim before: prepaid gas {}, used gas {}", env::prepaid_gas().0, env::used_gas().0);
+        log!("Used gas after {}",  env::used_gas().0);
 
-        let promise = ext_pembrock::ext(self.pembrock_id.clone())
+        ext_pembrock::ext(self.pembrock_id.clone())
             .with_static_gas(env::prepaid_gas() - GAS_FOR_CLAIM - GAS_FOR_GET_ACCOUNT_CALLBACK)
             .get_account(&account_id)
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_GET_ACCOUNT_CALLBACK)
                     .get_account_callback(account_id),
-            );
-
-        log!("claim after: used gas {}",  env::used_gas().0);
-
-        promise
+            )
     }
 
     #[private]
