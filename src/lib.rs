@@ -14,9 +14,7 @@ const GAS_FOR_FT_TRANSFER_CALLBACK: Gas = Gas(10_000_000_000_000);
 const GAS_FOR_FT_TRANSFER: Gas = Gas(10_000_000_000_000);
 const GAS_FOR_GET_ACCOUNT_CALLBACK: Gas =
     Gas(5_000_000_000_000 + GAS_FOR_FT_TRANSFER.0 + GAS_FOR_FT_TRANSFER_CALLBACK.0);
-const GAS_FOR_GET_ACCOUNT: Gas = Gas(25_000_000_000_000);
-const GAS_FOR_CLAIM: Gas =
-    Gas(25_000_000_000_000 + GAS_FOR_GET_ACCOUNT.0 + GAS_FOR_GET_ACCOUNT_CALLBACK.0);
+const GAS_FOR_CLAIM: Gas = Gas(10_000_000_000_000);
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -103,7 +101,7 @@ impl Contract {
     pub fn claim(&self) -> Promise {
         assert_one_yocto();
 
-        require!(env::prepaid_gas() >= GAS_FOR_CLAIM, "More gas is required");
+        require!(env::prepaid_gas() >= GAS_FOR_CLAIM + GAS_FOR_GET_ACCOUNT_CALLBACK, "More gas is required");
 
         let account_id = env::predecessor_account_id();
         require!(
@@ -112,7 +110,7 @@ impl Contract {
         );
 
         ext_pembrock::ext(self.pembrock_id.clone())
-            .with_static_gas(GAS_FOR_GET_ACCOUNT)
+            .with_static_gas(env::prepaid_gas() - GAS_FOR_CLAIM - GAS_FOR_GET_ACCOUNT_CALLBACK)
             .get_account(&account_id)
             .then(
                 Self::ext(env::current_account_id())
