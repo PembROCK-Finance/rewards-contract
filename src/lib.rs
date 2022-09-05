@@ -1,5 +1,6 @@
 use near_contract_standards::fungible_token::core::ext_ft_core;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::log;
 use near_sdk::{
     assert_one_yocto, collections::UnorderedMap, env, json_types::U128, near_bindgen, require,
     AccountId, Balance, BorshStorageKey, Gas, PanicOnDefault, Promise, PromiseError,
@@ -13,8 +14,8 @@ mod storage_impl;
 const GAS_FOR_FT_TRANSFER_CALLBACK: Gas = Gas(10_000_000_000_000);
 const GAS_FOR_FT_TRANSFER: Gas = Gas(10_000_000_000_000);
 const GAS_FOR_GET_ACCOUNT_CALLBACK: Gas =
-    Gas(20_000_000_000_000 + GAS_FOR_FT_TRANSFER.0 + GAS_FOR_FT_TRANSFER_CALLBACK.0);
-const GAS_FOR_CLAIM: Gas = Gas(20_000_000_000_000);
+    Gas(25_000_000_000_000 + GAS_FOR_FT_TRANSFER.0 + GAS_FOR_FT_TRANSFER_CALLBACK.0);
+const GAS_FOR_CLAIM: Gas = Gas(45_000_000_000_000);
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -109,14 +110,20 @@ impl Contract {
             "Account is not registered"
         );
 
-        ext_pembrock::ext(self.pembrock_id.clone())
+        log!("claim before: prepaid gas {}, used gas {}", env::prepaid_gas().0, env::used_gas().0);
+
+        let promise = ext_pembrock::ext(self.pembrock_id.clone())
             .with_static_gas(env::prepaid_gas() - GAS_FOR_CLAIM - GAS_FOR_GET_ACCOUNT_CALLBACK)
             .get_account(&account_id)
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FOR_GET_ACCOUNT_CALLBACK)
                     .get_account_callback(account_id),
-            )
+            );
+
+        log!("claim after: used gas {}",  env::used_gas().0);
+
+        promise
     }
 
     #[private]

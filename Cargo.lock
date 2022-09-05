@@ -868,7 +868,7 @@ dependencies = [
 
 [[package]]
 name = "rewards"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "near-contract-standards",
  "near-sdk",
