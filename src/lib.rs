@@ -102,9 +102,16 @@ impl Contract {
     pub fn claim(&self) -> Promise {
         assert_one_yocto();
 
-        require!(env::prepaid_gas() >= GAS_FOR_CLAIM + GAS_FOR_GET_ACCOUNT_CALLBACK, "More gas is required");
+        require!(
+            env::prepaid_gas() >= GAS_FOR_CLAIM + GAS_FOR_GET_ACCOUNT_CALLBACK,
+            "More gas is required"
+        );
 
-        log!("Prepaid gas {}, used gas before {}", env::prepaid_gas().0, env::used_gas().0);
+        log!(
+            "Prepaid gas {}, used gas before {}",
+            env::prepaid_gas().0,
+            env::used_gas().0
+        );
 
         let account_id = env::predecessor_account_id();
         require!(
@@ -112,7 +119,7 @@ impl Contract {
             "Account is not registered"
         );
 
-        log!("Used gas after {}",  env::used_gas().0);
+        log!("Used gas after {}", env::used_gas().0);
 
         ext_pembrock::ext(self.pembrock_id.clone())
             .with_static_gas(env::prepaid_gas() - GAS_FOR_CLAIM - GAS_FOR_GET_ACCOUNT_CALLBACK)
@@ -175,5 +182,155 @@ impl Contract {
             .insert(&account_id, &claimed_rewards.into());
 
         0.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use near_sdk::{
+        test_utils::{accounts, VMContextBuilder},
+        testing_env, Gas, PromiseError, ONE_YOCTO,
+    };
+
+    use crate::AccountInfo;
+    use crate::Contract;
+
+    #[test]
+    fn test_get_claimed_reward() {
+        let mut contract = Contract::new(accounts(0), accounts(1));
+        contract.register_account(&accounts(2));
+
+        match contract.get_claimed_rewards(&accounts(2)) {
+            res if res == 0.into() => (),
+            _ => panic!("test_get_claimed_reward_error: incorrect claim amount"),
+        };
+    }
+
+    #[test]
+    fn test_claim() {
+        let mut contract = Contract::new(accounts(0), accounts(1));
+        contract.register_account(&accounts(2));
+
+        let mut context = VMContextBuilder::new();
+        testing_env!(context
+            .predecessor_account_id(accounts(2))
+            .attached_deposit(ONE_YOCTO)
+            .prepaid_gas(Gas::ONE_TERA * 90)
+            .build());
+
+        contract.claim();
+    }
+
+    #[test]
+    #[should_panic = "Requires attached deposit of exactly 1 yoctoNEAR"]
+    fn test_claim_assert_one_yocto_fail() {
+        let contract = Contract::new(accounts(0), accounts(1));
+        contract.claim();
+    }
+
+    #[test]
+    #[should_panic = "Account is not registered"]
+    fn test_claim_predecessor_account_not_registered_fail() {
+        let contract = Contract::new(accounts(0), accounts(1));
+
+        let mut context = VMContextBuilder::new();
+        testing_env!(context
+            .predecessor_account_id(accounts(2))
+            .attached_deposit(ONE_YOCTO)
+            .prepaid_gas(Gas::ONE_TERA * 90)
+            .build());
+
+        contract.claim();
+    }
+
+    #[test]
+    fn test_get_account_callback() {
+        let mut contract = Contract::new(accounts(0), accounts(1));
+        contract.register_account(&accounts(2));
+
+        let mut context = VMContextBuilder::new();
+        testing_env!(context
+            .predecessor_account_id(accounts(2))
+            .attached_deposit(ONE_YOCTO)
+            .prepaid_gas(Gas::ONE_TERA * 100)
+            .build());
+
+        contract.get_account_callback(
+            accounts(2),
+            Ok(AccountInfo {
+                total_rewards: 100.into(),
+            }),
+        );
+
+        let claimed_rew = contract.claimed_rewards.get(&accounts(2));
+        assert!(claimed_rew == 100.into(), "Claimed reward incorrect");
+    }
+
+    #[test]
+    fn test_get_account_callback_promise_error() {
+        let mut contract = Contract::new(accounts(0), accounts(1));
+        contract.register_account(&accounts(2));
+
+        let mut context = VMContextBuilder::new();
+        testing_env!(context
+            .predecessor_account_id(accounts(2))
+            .attached_deposit(ONE_YOCTO)
+            .prepaid_gas(Gas::ONE_TERA * 100)
+            .build());
+
+        match contract.get_account_callback(accounts(2), Err(PromiseError::Failed)) {
+            near_sdk::PromiseOrValue::Value(value) if value == 0.into() => (),
+            _ => panic!("Incorrect value returned, expected 0"),
+        };
+    }
+
+    #[test]
+    fn test_ft_transfer_callback() {
+        let mut contract = Contract::new(accounts(0), accounts(1));
+        contract.register_account(&accounts(2));
+
+        let mut context = VMContextBuilder::new();
+        testing_env!(context
+            .predecessor_account_id(accounts(2))
+            .attached_deposit(ONE_YOCTO)
+            .prepaid_gas(Gas::ONE_TERA * 100)
+            .build());
+
+        contract.get_account_callback(
+            accounts(2),
+            Ok(AccountInfo {
+                total_rewards: 100.into(),
+            }),
+        );
+
+        match contract.ft_transfer_callback(accounts(2), 0.into(), 100.into(), Ok(())) {
+            res if res == 100.into() => (),
+            _ => panic!("Incorrect unclaimed reward returned, expected 100"),
+        };
+    }
+
+    #[test]
+    fn test_ft_transfer_callback_promise_error() {
+        let mut contract = Contract::new(accounts(0), accounts(1));
+        contract.register_account(&accounts(2));
+
+        let mut context = VMContextBuilder::new();
+        testing_env!(context
+            .predecessor_account_id(accounts(2))
+            .attached_deposit(ONE_YOCTO)
+            .prepaid_gas(Gas::ONE_TERA * 100)
+            .build());
+
+        contract.get_account_callback(
+            accounts(2),
+            Ok(AccountInfo {
+                total_rewards: 100.into(),
+            }),
+        );
+
+        match contract.ft_transfer_callback(accounts(2), 0.into(), 100.into(), Err(PromiseError::Failed)) {
+            res if res == 0.into() => (),
+            _ => panic!("Incorrect unclaimed reward returned, expected 0"),
+        };
     }
 }
