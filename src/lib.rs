@@ -65,7 +65,7 @@ impl Contract {
     }
 
     fn is_account_registered(&self, account_id: &AccountId) -> bool {
-        self.claimed_rewards.get(&account_id).is_some()
+        self.claimed_rewards.get(account_id).is_some()
     }
 
     fn register_account(&mut self, account_id: &AccountId) {
@@ -336,9 +336,10 @@ mod tests {
             Err(PromiseError::Failed),
         );
 
-        let claimed_uesr_rewards = contract.get_claimed_rewards(&accounts(2));
-
         assert!(res == 0.into(), "Unexpected test return, expected 0");
-        assert!(claimed_uesr_rewards == 10.into(), "Incorrect claimed reward, expected 10");
+        assert!(
+            contract.get_claimed_rewards(&accounts(2)) == 10.into(),
+            "Incorrect claimed reward, expected 10"
+        );
     }
 }
