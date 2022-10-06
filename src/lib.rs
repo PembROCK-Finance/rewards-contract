@@ -336,13 +336,9 @@ mod tests {
             Err(PromiseError::Failed),
         );
 
-        if res == 0.into() {
-            assert!(
-                contract.get_claimed_rewards(&accounts(2)) == 10.into(),
-                "Claimed rewards incorrect"
-            )
-        } else {
-            panic!("Unexpected test result returned, expected 0")
-        }
+        let claimed_uesr_rewards = contract.get_claimed_rewards(&accounts(2));
+
+        assert!(res == 0.into(), "Unexpected test return, expected 0");
+        assert!(claimed_uesr_rewards == 10.into(), "Incorrect claimed reward, expected 10");
     }
 }
