@@ -279,13 +279,9 @@ mod tests {
             .prepaid_gas(Gas::ONE_TERA * 100)
             .build());
 
-        if let PromiseOrValue::Value(res) =
-            contract.get_account_callback(accounts(2), Err(PromiseError::Failed))
-        {
-            assert!(res == 0.into());
-        } else {
-            panic!("Incorrect Promise returned, expected Value, got Promise")
-        };
+        let res = contract.get_account_callback(accounts(2), Err(PromiseError::Failed));
+
+        assert!(matches!(res, PromiseOrValue::Value(x) if x  == 0.into()));
     }
 
     #[test]
