@@ -189,7 +189,7 @@ impl Contract {
 mod tests {
     use near_sdk::{
         test_utils::{accounts, VMContextBuilder},
-        testing_env, Gas, PromiseError, ONE_YOCTO,
+        testing_env, Gas, PromiseError, PromiseOrValue, ONE_YOCTO,
     };
 
     use crate::AccountInfo;
@@ -198,12 +198,13 @@ mod tests {
     #[test]
     fn test_get_claimed_reward() {
         let mut contract = Contract::new(accounts(0), accounts(1));
-        contract.register_account(&accounts(2));
+        contract.claimed_rewards.insert(&accounts(2), &100);
 
-        match contract.get_claimed_rewards(&accounts(2)) {
-            res if res == 0.into() => (),
-            _ => panic!("test_get_claimed_reward_error: incorrect claim amount"),
-        };
+        let res = contract.get_claimed_rewards(&accounts(2));
+        assert!(
+            res == 100.into(),
+            "test_get_claimed_reward_error: incorrect claim amount"
+        )
     }
 
     #[test]
@@ -278,9 +279,12 @@ mod tests {
             .prepaid_gas(Gas::ONE_TERA * 100)
             .build());
 
-        match contract.get_account_callback(accounts(2), Err(PromiseError::Failed)) {
-            near_sdk::PromiseOrValue::Value(value) if value == 0.into() => (),
-            _ => panic!("Incorrect value returned, expected 0"),
+        if let PromiseOrValue::Value(res) =
+            contract.get_account_callback(accounts(2), Err(PromiseError::Failed))
+        {
+            assert!(res == 0.into());
+        } else {
+            panic!("Incorrect Promise returned, expected Value, got Promise")
         };
     }
 
@@ -303,10 +307,11 @@ mod tests {
             }),
         );
 
-        match contract.ft_transfer_callback(accounts(2), 0.into(), 100.into(), Ok(())) {
-            res if res == 100.into() => (),
-            _ => panic!("Incorrect unclaimed reward returned, expected 100"),
-        };
+        let res = contract.ft_transfer_callback(accounts(2), 0.into(), 100.into(), Ok(()));
+        assert!(
+            res == 100.into(),
+            "Incorrect unclaimed reward returned, expected 100"
+        );
     }
 
     #[test]
@@ -328,9 +333,20 @@ mod tests {
             }),
         );
 
-        match contract.ft_transfer_callback(accounts(2), 0.into(), 100.into(), Err(PromiseError::Failed)) {
-            res if res == 0.into() => (),
-            _ => panic!("Incorrect unclaimed reward returned, expected 0"),
-        };
+        let res = contract.ft_transfer_callback(
+            accounts(2),
+            10.into(),
+            100.into(),
+            Err(PromiseError::Failed),
+        );
+
+        if res == 0.into() {
+            assert!(
+                contract.get_claimed_rewards(&accounts(2)) == 10.into(),
+                "Claimed rewards incorrect"
+            )
+        } else {
+            panic!("Unexpected test result returned, expected 0")
+        }
     }
 }
